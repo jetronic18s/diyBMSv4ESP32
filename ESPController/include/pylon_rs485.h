@@ -37,6 +37,7 @@ class PylonRS485 {
       HAL_ESP32& hal;
 
       uint16_t pack_voltage;
+      uint16_t pack_current;
       uint16_t charge_voltage;
       uint16_t discharge_voltage;
       uint16_t charge_current_limit;

@@ -142,6 +142,8 @@ void PylonRS485::handle_rx() {
             return;
          }
 
+         ESP_LOGD(TAG, "Pylon RS485 - Rec cmd CID2:0x%04X", hdr.cid2);
+
          // header seems good, parse command
          switch (hdr.cid2) {
             case CMD_VERSION:
@@ -161,10 +163,12 @@ void PylonRS485::handle_rx() {
                // If current shunt is installed, use the voltage from that as it should be more accurate
                if (settings.currentMonitoringEnabled && current_monitor.validReadings) {
                   pack_voltage = current_monitor.modbus.voltage * 1000.0;
+                  pack_current = current_monitor.modbus.current * 10;
                }
                else {
                   // Use highest bank voltage calculated by controller and modules
                   pack_voltage = rules.highestBankVoltage;
+                  pack_current= 0; //unknown
                }
 
                // This is a fixed response taken from PylonTech documentation, with only pack voltage modified
@@ -178,12 +182,12 @@ void PylonRS485::handle_rx() {
                                                                "10"     // Cell count = 16 (10h)
                                                                "0D200D200D200D200D200D200D200D200D200D200D200D200D200D200D200D20" // 16x cell voltage 3360mv as hexa ascii (taken from doc example)
                                                                "010BC30BC30BC30BCD0BCD" // 5x temperature sensor with value in kelvins (taken from doc example)
-                                                               "0000"   // current = 0 (resolution = tenths of mA, realValue = thisValue * 100)
+                                                               "%04X"   // current = 0 (resolution = tenths of mA, realValue = thisValue * 100)
                                                                "%04X"   // pack voltage (mV)
                                                                "FFFF02" // remain capacity, user def = 02
                                                                "FFFF"   // total capacity
                                                                "0002"   // num of cycles
-                                    , pack_voltage);
+                                    ,pack_current, pack_voltage);
                //add length
                insertLength(tmp_buf, response_len);
                
@@ -249,8 +253,8 @@ void PylonRS485::handle_rx() {
                                                                "4600"   // CID1 + RET of zero
                                                                "XXXX"   // Placeholder for length (computed later)
                                                                "02"     // Command == ADDR
-                                                               "%04X"   // Charge limit
-                                                               "%04X"   // Discharge limit
+                                                               "%04X"   // Charge voltage limit
+                                                               "%04X"   // Discharge voltage limit
                                                                "%04X"   // Charge current
                                                                "%04X"   // Discharge current
                                                                "%02X"   // Status flags
@@ -258,7 +262,7 @@ void PylonRS485::handle_rx() {
                //add length
                insertLength(tmp_buf, response_len);
 
-               ESP_LOGD(TAG, "Pylon Charge Mgmt - Chrg limit: %dmV, Dischrg limit: %dmV, Chrg curr: %dmA, Dischrg curr: %dmA, Flags: 0x%02X",
+               ESP_LOGD(TAG, "Pylon Charge Mgmt - Chrg limit: %dmV, Dischrg limit: %dmV, Chrg curr: %d (0.1A), Dischrg curr: %d  (0.1A), Flags: 0x%02X",
                         charge_voltage, discharge_voltage, charge_current_limit, discharge_current_limit, flags);
             break;
 
